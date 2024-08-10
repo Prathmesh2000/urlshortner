@@ -1,10 +1,13 @@
 const bodyParser = require('body-parser');
 const express = require('express');
+const serverless = require('serverless-http')
 
 const DEFAULT_TTL_TIME = 120000 //120s
 const app = express();
+const router = express.Router();
 
 let shortURLMap = {};
+app.use('./netlify/', router)
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
@@ -17,7 +20,7 @@ const genrateRandomShortURL = ()=>{
     return Math.random().toString(36).slice(2) + currTime.toString().slice(0, 1)
 }
 
-app.post('/shorten', (req, res)=>{
+router.post('/shorten', (req, res)=>{
     try{
         const {long_url=null, ttl_seconds=DEFAULT_TTL_TIME} = req.body;
         let {custom_alias=null}  = req.body;
@@ -48,7 +51,7 @@ app.post('/shorten', (req, res)=>{
 
 
 
-app.get('/:id', (req, res)=>{
+router.get('/:id', (req, res)=>{
     try{
         const short_url = req?.params?.id;
         let urlData = shortURLMap[short_url] || null;
@@ -76,7 +79,7 @@ app.get('/:id', (req, res)=>{
     }
 })
 
-app.get(`/analytics/:id`, (req, res) => {
+router.get(`/analytics/:id`, (req, res) => {
     try{
         const short_url = req?.params?.id;
         let data = shortURLMap[short_url];
@@ -99,7 +102,7 @@ app.get(`/analytics/:id`, (req, res) => {
     }
 })
 
-app.put('/update/:id', (req, res) => {
+router.put('/update/:id', (req, res) => {
     try{
         const short_url = req?.params?.id;
         let currTime = Date.now()
@@ -138,7 +141,7 @@ app.put('/update/:id', (req, res) => {
     }
 })
 
-app.delete('/delete/:id', (req,res)=>{
+router.delete('/delete/:id', (req,res)=>{
     try{
         const short_url = req?.params?.id;
         let currTime = Date.now()
@@ -164,3 +167,5 @@ app.delete('/delete/:id', (req,res)=>{
         })
     }
 })
+
+module.exports.handler = serverless(app)
