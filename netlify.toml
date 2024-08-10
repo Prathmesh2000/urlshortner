@@ -1,26 +1,7 @@
 [build]
-  functions = "functions"
+  functions = "functions" # This points to the directory where serverless functions are located
 
 [[redirects]]
-  from = "/"
+  from = "/*"
   to = "/.netlify/functions/server"
   status = 200
-  force = true
-
-[[redirects]]
-  from = "/shorten"
-  to = "/.netlify/functions/server/shorten"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/:id"
-  to = "/.netlify/functions/server/:id"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/analytics/:id"
-  to = "/.netlify/functions/server/analytics/:id"
-  status = 200
-  force = true
