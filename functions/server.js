@@ -17,6 +17,10 @@ const genrateRandomShortURL = () => {
     return Math.random().toString(36).slice(2) + currTime.toString().slice(0, 1);
 };
 
+router.get('/', (req, res) => {
+    return res.send('hello world')
+})
+
 router.post('/shorten', (req, res) => {
     try {
         const { long_url = null, ttl_seconds = DEFAULT_TTL_TIME } = req.body;
