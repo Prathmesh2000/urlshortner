@@ -47,7 +47,7 @@ router.use(express.json());
 
 router.get('/test', async(req, res) => {
     try{
-        const collections = await db.collection('urldata').listCollections().toArray();
+        const collections = await db.listCollections().toArray();
 
         res.status(200).json({ db: collections, a:"fdsfds"})
     } catch (err) {
