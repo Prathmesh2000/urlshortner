@@ -45,9 +45,11 @@ const shortURLData = async (key) => {
 router.use(express.json());
 
 
-router.get('/test', (req, res) => {
+router.get('/test', async(req, res) => {
     try{
-        res.status(200).json({ db: JSON.stringify(db), a:"fdsfds"})
+        const collections = await db.collection('urldata').listCollections().toArray();
+
+        res.status(200).json({ db: collections, a:"fdsfds"})
     } catch (err) {
         res.status(400).json({ error:"eror", p: err.message})
 
