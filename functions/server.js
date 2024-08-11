@@ -47,6 +47,7 @@ router.use(express.json());
 
 router.get('/test', async(req, res) => {
     try{
+        let db = client.db('shorturl');
         const collections = await db.listCollections().toArray();
 
         res.status(200).json({ db: collections, a:"fdsfds"})
