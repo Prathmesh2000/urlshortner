@@ -45,8 +45,13 @@ const shortURLData = async (key) => {
 router.use(express.json());
 
 
-router.get('/', (req, res) => {
-    return res.send('hello world')
+router.get('/test', (req, res) => {
+    try{
+        res.status(200).json({ db: db, a:"fdsfds"})
+    } catch (err) {
+        res.status(400).json({ error:"eror"})
+
+    }
 })
 
 router.post('/shorten', async(req, res) => {
