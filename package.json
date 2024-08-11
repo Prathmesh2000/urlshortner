@@ -5,13 +5,15 @@
   "main": "index.js",
   "scripts": {
     "build": "netlify deploy --prod",
-    "dev": "nodemon server.js"
+    "dev": "nodemon functions/server.js",
+    "start": "node functions/server.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "body-parser": "^1.20.2",
     "express": "^4.19.2",
+    "mongodb": "^6.8.0",
     "nodemon": "^3.1.4",
     "serverless-http": "^3.2.0"
   }

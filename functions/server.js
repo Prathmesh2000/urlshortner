@@ -1,50 +1,81 @@
 const bodyParser = require('body-parser');
 const express = require('express');
 const serverless = require('serverless-http');
+const { client } = require('../db');
 
-const DEFAULT_TTL_TIME = 120000; // 120s
+const DEFAULT_TTL_TIME = 12000000; // 120s
 const app = express();
 const router = express.Router();
-
-let shortURLMap = {};
 
 app.use('/.netlify/functions/', router); // Updated this line
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-const genrateRandomShortURL = () => {
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+try {
+    var db = client.db('shorturl');
+    if(db) console.log('DB connected')
+} catch (err) {
+    console.error(err);
+}
+
+const genrateRandomShortURL = async () => {
     let currTime = Date.now();
-    return Math.random().toString(36).slice(2) + currTime.toString().slice(0, 1);
+    let shorturl =  Math.random().toString(36).slice(2) + currTime.toString().slice(0, 1);
+    if(await shortURLData(shorturl)){
+        return genrateRandomShortURL()
+    } else {
+        return shorturl;
+    }
 };
+
+const shortURLData = async (key) => {
+    try{
+        const query = { [key]: { $exists: true } };
+        return await db.collection('urldata').findOne(query)
+    } catch (err) {
+        return true;
+    }
+}
+
+router.use(express.json());
+
 
 router.get('/', (req, res) => {
     return res.send('hello world')
 })
 
-router.post('/shorten', (req, res) => {
+router.post('/shorten', async(req, res) => {
     try {
         const { long_url = null, ttl_seconds = DEFAULT_TTL_TIME } = req.body;
         let { custom_alias = null } = req.body;
         if (!long_url) return res.status(400).json({
             msg: 'long_url is mandatory field',
         });
-        if (!custom_alias || shortURLMap[custom_alias]) {
-            custom_alias = genrateRandomShortURL();
+        if (!custom_alias || await shortURLData(custom_alias)) {
+            custom_alias = await genrateRandomShortURL();
         }
-        shortURLMap[custom_alias] = {
-            url: long_url,
-            ttl: ttl_seconds,
-            hitCount: 0,
-            hitTime: [],
-            expiretime: ttl_seconds + Date.now()
-        };
+        await db.collection('urldata').insertOne({
+            [custom_alias]: {
+                url: long_url,
+                ttl: ttl_seconds,
+                shortURL: custom_alias,
+                hitCount: 0,
+                hitTime: [],
+                expiretime: ttl_seconds + Date.now()
+            }
+        })
 
         const baseUrl = req.headers.host.includes('localhost')
             ? `http://${req.headers.host}/.netlify/functions`
             : `https://${req.headers.host}/.netlify/functions`;
 
         return res.status(200).json({
-            "short_url": `${baseUrl}/${custom_alias}`  // Updated this line
+            "short_url": `${baseUrl}/${custom_alias}`  
         });
     } catch (err) {
         console.error(err.message);
@@ -54,10 +85,11 @@ router.post('/shorten', (req, res) => {
     }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const short_url = req.params.id;
-        let urlData = shortURLMap[short_url] || null;
+        let urlData = await shortURLData(short_url) || {};
+        urlData = urlData[short_url] || null;
         let currTime = Date.now();
         if (!urlData) {
             return res.status(404).json({
@@ -70,8 +102,18 @@ router.get('/:id', (req, res) => {
             });
         }
         let dateNdTime = new Date().toUTCString();
-        shortURLMap[short_url].hitCount += 1;
-        shortURLMap[short_url].hitTime.push(dateNdTime);
+        
+        let tempHitCount = urlData.hitCount + 1;
+        let tempHitTime = [...urlData.hitTime, dateNdTime];
+
+        const filter = { [`${short_url}.shortURL`]: `${short_url}` };
+        const update = {
+            $set: {
+                [`${short_url}.hitCount`]: tempHitCount,
+                [`${short_url}.hitTime`]: tempHitTime
+            }
+        };
+        await db.collection('urldata').updateOne(filter, update);
         return res.redirect(`https://${urlData.url}`);
     } catch (err) {
         console.error(err.message);
@@ -81,10 +123,12 @@ router.get('/:id', (req, res) => {
     }
 });
 
-router.get(`/analytics/:id`, (req, res) => {
+router.get(`/analytics/:id`, async(req, res) => {
     try {
         const short_url = req.params.id;
-        let data = shortURLMap[short_url];
+        let data = await shortURLData(short_url) || {};
+        data = data[short_url] || null;
+
         if (!data) {
             return res.status(404).json({
                 msg: 'data not found'
@@ -104,21 +148,23 @@ router.get(`/analytics/:id`, (req, res) => {
     }
 });
 
-router.put('/update/:id', (req, res) => {
+router.put('/update/:id', async(req, res) => {
     try {
         const short_url = req.params.id;
         let currTime = Date.now();
         let { custom_alias = null } = req.body;
-        if (shortURLMap[custom_alias]) {
+        if (await shortURLData(custom_alias)) {
             return res.status(400).json({
                 msg: 'Alias already exists '
             });
         }
         if (!custom_alias) {
-            custom_alias = genrateRandomShortURL();
+            custom_alias = await genrateRandomShortURL();
         }
 
-        let data = shortURLMap[short_url];
+        let data = await shortURLData(short_url);
+        data = data[short_url] || null;
+
         if (!data) {
             return res.status(404).json({
                 msg: 'Alias does not exist '
@@ -129,9 +175,14 @@ router.put('/update/:id', (req, res) => {
                 msg: 'Alias has expired'
             });
         }
-        let tempObj = { ...shortURLMap[short_url] };
-        shortURLMap[custom_alias] = { ...tempObj };
-        delete shortURLMap[short_url];
+
+        await db.collection('urldata').insertOne({
+            [custom_alias]: {...data, shortURL: custom_alias}
+        })
+        const filter = { [`${short_url}.shortURL`]: `${short_url}` };
+
+        await db.collection('urldata').deleteOne(filter);
+
         return res.status(200).json({
             msg: 'Successfully updated'
         });
@@ -143,11 +194,13 @@ router.put('/update/:id', (req, res) => {
     }
 });
 
-router.delete('/delete/:id', (req, res) => {
+router.delete('/delete/:id', async (req, res) => {
     try {
         const short_url = req.params.id;
         let currTime = Date.now();
-        let data = shortURLMap[short_url];
+        let data = await shortURLData(short_url);
+        data = data[short_url] || null;
+
         if (!data) {
             return res.status(404).json({
                 msg: 'Alias does not exist '
@@ -158,7 +211,10 @@ router.delete('/delete/:id', (req, res) => {
                 msg: 'Alias has expired'
             });
         }
-        delete shortURLMap[short_url];
+        const filter = { [`${short_url}.shortURL`]: `${short_url}` };
+
+        await db.collection('urldata').deleteOne(filter);
+
         return res.status(200).json({
             msg: 'Successfully deleted.'
         });
