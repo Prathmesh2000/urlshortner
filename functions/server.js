@@ -49,7 +49,7 @@ router.get('/test', (req, res) => {
     try{
         res.status(200).json({ db: db, a:"fdsfds"})
     } catch (err) {
-        res.status(400).json({ error:"eror"})
+        res.status(400).json({ error:"eror", p: err.message})
 
     }
 })
