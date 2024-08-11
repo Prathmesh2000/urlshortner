@@ -47,7 +47,7 @@ router.use(express.json());
 
 router.get('/test', (req, res) => {
     try{
-        res.status(200).json({ db: db, a:"fdsfds"})
+        res.status(200).json({ db: JSON.stringify(db), a:"fdsfds"})
     } catch (err) {
         res.status(400).json({ error:"eror", p: err.message})
 
